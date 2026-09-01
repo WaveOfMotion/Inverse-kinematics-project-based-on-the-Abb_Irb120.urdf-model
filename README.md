@@ -194,8 +194,17 @@ Error = 5.551115123125783e-17
 ```
 
 ## Trajectory testing
+MATLAB is used to generate a sequence of Cartesian target positions. For each target point:
+
+1) The previous valid joint configuration is supplied as the initial IK guess
+2) The C MEX inverse kinematics function is executed
+3) Joint angles and convergence information are returned
+4) Successfully calculated joint configurations can be visualized using the MATLAB rigidBodyTree model
+
+## Current limitations
 
 
+   
 
 
 
