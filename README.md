@@ -258,3 +258,6 @@ if (theta < 1e-8)
 , but further development must be proceeded to develop a strong C engine for inverse kinematics operations.
 
 Because of this, mathematically valid solutions can sometimes contain large changes in individual wrist-joint angles, particularly near robot singularities.
+
+## Future development
+For future updates, I plan to optimize this inverse kinematics solver to minimize its current limitations and extend its capabilities and perform testing in ROS2 environment for further testing the developed inverse kinematics solver.
