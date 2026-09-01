@@ -14,6 +14,11 @@ The main features are:
   [x] Cartesian trajectory testing
   [x] Configurable IK convergence options and step limits
 
+## Purpose
+The purpose of this project is to study and implement the mathematics behind industrial robot kinematics directly in C, including transformation matrices, numerical Jacobians, rotation mathematics, linear equation solving, singularity handling, and iterative numerical inverse kinematics.
+
+MATLAB is used primarily as a testing and visualization environment while the core kinematics engine remains implemented in native C.
+
 # Project Structure
 ## Forward kinematics
 In this section, I represent each robot joint as homogeneous 4x4 transformation:
@@ -201,11 +206,55 @@ MATLAB is used to generate a sequence of Cartesian target positions. For each ta
 3) Joint angles and convergence information are returned
 4) Successfully calculated joint configurations can be visualized using the MATLAB rigidBodyTree model
 
-## Current limitations
+# Conclusion
+The current implementation focuses on Cartesian inverse kinematics rather than complete robot trajectory planning.
 
+The solver currently does not implement:
+[x] physical joint velocity limits
+[x] physical joint acceleration limits
+[x] trajectory time parameterization
+[x] ABB IRB120 mechanical joint limits
+[x] explicit selection between multiple IK branches
+[x] joint-configuration continuity optimization near singularities
 
-   
+Besides that, I am efectively avoiding precision errors:
+```iecst
+double sin_pitch = -T->m[2][0];
 
+    if(sin_pitch > 1.0)
+    {
+        sin_pitch = 1;
+    } else { if(sin_pitch < -1)
+        sin_pitch = -1;
+    }
+```
+, and also avoiding gimbal lock:
+```iecst
+if(fabs(cos_pitch) < 1e-8)
+    {
+        pose.roll = 0.0;
+        pose.yaw = atan2(-T->m[0][1], T->m[1][1]);
+    } else {
+        
+        pose.roll = atan2(T->m[2][1], T->m[2][2]);
+        pose.yaw = atan2(T->m[1][0], T->m[0][0]);
+    }
+```
+, and use small-angle approximation when orientation is very close to zero:
+```iecst
+if (theta < 1e-8)
+    {
+        /* ---> R_21 - R_12 = 2sin(theta) * u_x */
+        w[0] = 0.5*(R[2][1] - R[1][2]);
 
+        /* R_02 - R_20 = 2sin(theta) * u_y */
+        w[1] = 0.5*(R[0][2] - R[2][0]);
 
+        /* R_10 - R_01 = 2sin(theta) * u_z */
+        w[2] = 0.5*(R[1][0] - R[0][1]);
+        return;
+    }
+```
+, but further development must be proceeded to develop a strong C engine for inverse kinematics operations.
 
+Because of this, mathematically valid solutions can sometimes contain large changes in individual wrist-joint angles, particularly near robot singularities.
