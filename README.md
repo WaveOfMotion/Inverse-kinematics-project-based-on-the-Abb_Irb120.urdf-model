@@ -104,6 +104,97 @@ In the final for 6 - joints I perform 12 computations. The returned variable is 
 
 ## Damped Least Squares
 
+The solve uses a damped-least-squares approach. At every iteration:
+1) Calculating Current forward kinematics
+2) Calculating Cartesian position and orientation errors
+3) Error-vector magnitudes are limited to prevent excessively large Cartesian steps
+4) A numerical 6x6 Jacobian is generated
+5) Position and orientation weighting is applied
+6) The DLS system is constructed: A = J * J^T + lambda^2 * I
+7) The linear system is solved: A * y = error
+8) Joint corrections are calculated: dq = J^T * y
+9) Each joint correction is limited by maxJointStep
+10) The new joint configuration is calculated: q = q + dq
+
+The procedure repeats until the Cartesian position and orientation errors satisfy the configured tolerances or the maximum iteration count is reached.
+
+## Gaussian solver
+Implements a custom linear solver for the 6x6 DLS approach. The functionn solve_6x6 first copies the supplied matrix and right-hand-side vector so the original input data is not modified. 
+
+Then I call function 'forward_elimination()'. Here, Forward elimination uses partial pivoting by selecting the largest available pivot in each column. Very small pivots are eliminated to prevent solving singular or numerically unstable systems.
+
+After function 'forward_elimination', I call 'back_substitution' which eliminates the smallest pivots under the main diagonal.
+
+## IK configuration
+Default solver parameters are defined using function 'ik_default_options':
+```iecst
+void ik_default_options(IK_Options *options)
+{
+    options->maxIterations = 300;
+    options->positionTolerance = 1e-5;
+    options->orientationTolerance = 1e-4;
+    options->damping = 1e-2;
+    options->numericalStep = 1e-6;
+    options->maxCartesianStep = 0.010;   /* 10 mm */
+    options->maxOrientationStep = 0.050; /* about 2.9 deg */
+    options->maxJointStep = 0.050;       /* about 2.9 deg */
+    options->positionWeight = 1.0;
+    options->orientationWeight = 0.25;
+}
+```
+These limits control the numerical IK iteration and should not be interpreted as physical robot velocity or acceleration limits.
+
+## MATLAB MexFunction
+The C implementation is compiled as a MATLAB MEX module:
+```iecst
+void mexFunction(
+    int nlhs,              /* Number of expected mxArray output arguments, specified as an integer */
+    mxArray *plhs[],       /* Array of pointers to the expected mxArray output arguments */
+    int nrhs,              /* Number of input arguments */
+    const mxArray *prhs[]) /* Array of pointers to the mxArray input arguments */
+```
+In MATLAB Window to compile my C implementation in .mexw64, I must write:
+```iecst
+mex CallMexFunction.c Rotation_math.c Gaussian_solver.c ABB_IRB120_forward_kinematics.c ABB_IRB120_inverse_kinematics.c
+```
+To the C solver, MATLAB sends:
+[x] previous/initial configuration
+[x] target Cartesian pose
+
+The Mex function the returns:
+[x] Calculted joint angles
+[x] Resultig transformation amtrix
+[x] Convergence information
+
+## Forward kinematics validation
+The C forward kinematics implementation was compared against MATLAB Robotics System Toolbox using the ABB IRB120 URDF model.
+For example, for joint configuration in MATLAB:
+```iecst
+q = [0, pi/4, pi/5, 0, 0, 0];
+```
+, the calculated transformation matrix using C implementation was:
+```iecst
+Transformation matrix from C mex
+    0.1564         0    0.9877    0.3186
+         0    1.0000         0         0
+   -0.9877         0    0.1564    0.1225
+         0         0         0    1.0000
+```
+, and using MATLAB Robot System Toolbox as validity check:
+```iecst
+Transformation matrix from URDF usng FUN "getTransform"
+    0.1564         0    0.9877    0.3186
+         0    1.0000         0         0
+   -0.9877         0    0.1564    0.1225
+         0         0         0    1.0000
+```
+, therefore the computed error between both results was:
+```iecst
+Error = 5.551115123125783e-17
+```
+
+## Trajectory testing
+
 
 
 
